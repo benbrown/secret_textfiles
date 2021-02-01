@@ -1,0 +1,11 @@
+<h2><a href="/read/{{post.id}}">{{post.metadata.title}}</a></h2>
+
+{{{post.rendered}}}
+
+<h4>Most recent posts</h4>
+<ul>
+  {{#each mostRecentPosts}}
+    <li><a href="/read/{{id}}">{{metadata.title}}</a></li>
+  {{/each}}
+    <li><a href="/archive">Archive</a></li>
+</ul>

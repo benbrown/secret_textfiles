@@ -1,0 +1,57 @@
+body {
+  font-size: 18px;
+  font-family: 'Courier New', Courier, monospace;
+  padding: 1rem;
+  color: #666;
+  background-color: #F0F0F0;
+}
+
+header {
+  border-bottom: 1px solid #CCC;
+  padding: 0.5rem 0;
+}
+
+#main {
+  max-width: 33rem;
+  margin: 0px auto;
+}
+
+.youtube-container {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  padding-top: 56.25%; /* 16:9 Aspect Ratio (divide 9 by 16 = 0.5625) */
+}
+
+/* Then style the iframe to fit in the container div with full height and width */
+.responsive-iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+}
+
+nav.toolbar {
+  border-top: 1px solid #CCC;
+  border-bottom: 1px solid #CCC;
+  padding: 0.25rem 0;
+}
+
+nav.toolbar a {
+  display: inline-block;
+  text-decoration: none;
+  padding: 0.25rem 1rem;
+  border: 1px outset #FFF;
+}
+
+nav.toolbar a:hover {
+  background: #000;
+}
+
+
+a {
+  color: #FF0099;
+}
