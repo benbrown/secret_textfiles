@@ -11,7 +11,9 @@ const md = new MarkdownIt({
 });
 
 const fetchEmbed = async(url) => {
-  if (match = url.match(/\?v=(.*?)[\&$]/im)) {
+  console.log('match url',url)
+  if (match = url.match(/\?v=(.*?)(\&|\s|$)/im)) {
+    console.log('MATCHED UYOURUTBE');
     const id = match[1];
     return `<div class="youtube-container"><iframe class="responsive-iframe" src="https://www.youtube.com/embed/${ id }" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`
   } else {
