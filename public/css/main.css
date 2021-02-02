@@ -1,9 +1,10 @@
 body {
-  font-size: 18px;
+  font-size: 16px;
   font-family: 'Courier New', Courier, monospace;
   padding: 1rem;
-  color: #666;
+  color: #333;
   background-color: #F0F0F0;
+  line-height: 1.25rem;
 }
 
 header {
@@ -11,8 +12,12 @@ header {
   padding: 0.5rem 0;
 }
 
+header h1 a {
+  text-decoration: none;
+}
+
 #main {
-  max-width: 33rem;
+  max-width: 36rem;
   margin: 0px auto;
 }
 
@@ -54,4 +59,13 @@ nav.toolbar a:hover {
 
 a {
   color: #FF0099;
+}
+
+h1, h2, h3, h4, h5 {
+  margin-bottom: 0rem;
+  margin-top: 1rem;
+}
+
+h5 { 
+  margin-top: 0.5rem;
 }
