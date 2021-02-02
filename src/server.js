@@ -22,7 +22,7 @@ const auth = basicAuth({
 
 const rootUrl = process.env.ROOT_URL;
  
-app.get(`${ rootUrl }/`', async (req, res) => {
+app.get(`${ rootUrl }/`, async (req, res) => {
     // parser.parse(path.join(process.env.PATH_TO_TEXT,'2021-02-01.txt'));
     await parser.loadText(process.env.PATH_TO_TEXT, true);
 
