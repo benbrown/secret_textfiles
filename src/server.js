@@ -30,6 +30,7 @@ app.get(`${ rootUrl }/`, async (req, res) => {
     const mostRecentPosts = parser.sortDesc('datestamp').slice(0, process.env.RECENT_POSTS);
 
     res.render('home', {
+      rootUrl: rootUrl,
       title: process.env.SITE_NAME,
       post: latestPost,
       mostRecentPosts: mostRecentPosts,
@@ -41,6 +42,8 @@ app.get(`${ rootUrl }/archive`, async (req, res) => {
   await parser.loadText(process.env.PATH_TO_TEXT, true);
 
   res.render('archive', {
+
+    rootUrl: rootUrl,
     title: process.env.SITE_NAME,
     posts: parser.sortDesc('datestamp'),
   });  
@@ -63,6 +66,7 @@ app.get(`${ rootUrl }/read/*`, async (req, res) => {
   const mostRecentPosts = parser.sortDesc('datestamp').slice(0, process.env.RECENT_POSTS);
 
   res.render('home', {
+    rootUrl: rootUrl,
     title: process.env.SITE_NAME,
     post: post,
     mostRecentPosts: mostRecentPosts,
@@ -82,6 +86,7 @@ app.get(`${ rootUrl }/secret/edit/*`, auth, async (req, res) => {
   }
 
   res.render('secrets/edit', {
+    rootUrl: rootUrl,
     title: process.env.SITE_NAME,
     layout: 'secret',
     post: post,
@@ -101,6 +106,7 @@ app.get(`${ rootUrl }/secret/delete/*`, auth, async (req, res) => {
   }
 
   res.render('secrets/delete', {
+    rootUrl: rootUrl,
     title: process.env.SITE_NAME,
     layout: 'secret',
     post: post,
@@ -186,6 +192,7 @@ app.get(`${ rootUrl }/secret`, auth, async (req, res) => {
   await parser.loadText(process.env.PATH_TO_TEXT, true);
 
   res.render('secrets/controlpanel', {
+    rootUrl: rootUrl,
     layout: 'secret',
     title: process.env.SITE_NAME,
     posts: parser.sortDesc('datestamp', true, true),
