@@ -8,12 +8,14 @@ const app = express();
 const parser = require('./parser.js');
 const fs = require('fs');
 const basicAuth = require('express-basic-auth')
+const RSS = require('rss-generator');
 
 app.engine('handlebars', exphbs());
 app.set('views', process.env.PATH_TO_TEMPLATES)
 app.set('view engine', 'handlebars');
 
 const rootUrl = process.env.ROOT_URL;
+const baseUrl = process.env.BASE_URL;
 
 app.use(rootUrl, express.static('public'))
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -51,6 +53,35 @@ app.get(`${ rootUrl }/archive`, async (req, res) => {
   });  
 });
 
+app.get(`${ rootUrl }/feed`, async (req, res) => {
+  await parser.loadText(process.env.PATH_TO_TEXT, true);
+
+  const publicPosts = parser.sortDesc('datestamp');
+
+  var feed = new RSS({
+    title: process.env.SITE_NAME,
+    // description: 'description',
+    site_url: baseUrl,
+    pubDate: publicPosts[0].metadata.datestamp,
+  });
+ 
+
+  publicPosts.forEach((post) => {
+    /* loop over data and add to feed */
+    feed.item({
+        title:  post.metadata.title,
+        description: post.rendered,
+        url: `${ baseUrl }${ rootUrl }/read/${ post.id }`, // link to the item
+        // categories: ['Category 1','Category 2','Category 3','Category 4'], // optional - array of item categories
+        // author: 'Guest Author', // optional - defaults to feed author property
+        date: post.metadata.date, // any format that js Date can parse.
+    });
+  });
+
+  res.set('Content-Type', 'text/xml');
+  res.send(feed.xml({indent: true}));
+
+});
 
 app.get(`${ rootUrl }/read/*`, async (req, res) => {
   let post;
