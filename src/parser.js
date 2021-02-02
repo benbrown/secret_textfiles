@@ -10,7 +10,7 @@ const md = new MarkdownIt({
   linkify: false,
 });
 
-const fetchEmbed = async(url) => {
+const fetchYTEmbed = async(url) => {
   console.log('match url',url)
   if (match = url.match(/\?v=(.*?)(\&|\s|$)/im)) {
     console.log('MATCHED UYOURUTBE');
@@ -21,12 +21,16 @@ const fetchEmbed = async(url) => {
   }
 }
 
+const fetchTwitterEmbed = async(url) => {
+  return `<blockquote class="twitter-tweet"><a href="${ url }">${ url }</a></blockquote><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>`
+}
+
 const processEmbeds = async(content) => {
 
   if (urls = content.match(/^(http.*?youtube.*?)$/img)) {
     for (let url of urls) {
       try {
-        let embed = await fetchEmbed(url);
+        let embed = await fetchYTEmbed(url);
         if (embed !== false) {
           content = content.replace(url, embed);
         }
@@ -35,6 +39,19 @@ const processEmbeds = async(content) => {
       }
     }
   }
+  if (urls = content.match(/^(http.*?twitter.*?)$/img)) {
+    for (let url of urls) {
+      try {
+        let embed = await fetchTwitterEmbed(url);
+        if (embed !== false) {
+          content = content.replace(url, embed);
+        }
+      } catch(err) {
+        debug('error with oembed', err);
+      }
+    }
+  }
+
   return content;
 
 }
