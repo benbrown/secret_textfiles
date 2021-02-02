@@ -12,7 +12,10 @@ const basicAuth = require('express-basic-auth')
 app.engine('handlebars', exphbs());
 app.set('views', process.env.PATH_TO_TEMPLATES)
 app.set('view engine', 'handlebars');
-app.use(express.static('public'))
+
+const rootUrl = process.env.ROOT_URL;
+
+app.use(`${ rootUrl }/public`, express.static('public'))
 app.use(bodyParser.urlencoded({ extended: true }));
 
 const auth = basicAuth({
@@ -20,7 +23,6 @@ const auth = basicAuth({
   challenge: true,
 })
 
-const rootUrl = process.env.ROOT_URL;
  
 app.get(`${ rootUrl }/`, async (req, res) => {
     // parser.parse(path.join(process.env.PATH_TO_TEXT,'2021-02-01.txt'));
