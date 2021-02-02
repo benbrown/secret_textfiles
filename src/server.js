@@ -19,8 +19,10 @@ const auth = basicAuth({
   users: { 'ben': 'secret' },
   challenge: true,
 })
+
+const rootUrl = process.env.ROOT_URL;
  
-app.get('/', async (req, res) => {
+app.get(`${ rootUrl }/`', async (req, res) => {
     // parser.parse(path.join(process.env.PATH_TO_TEXT,'2021-02-01.txt'));
     await parser.loadText(process.env.PATH_TO_TEXT, true);
 
@@ -34,7 +36,7 @@ app.get('/', async (req, res) => {
     });  
 });
 
-app.get('/archive', async (req, res) => {
+app.get(`${ rootUrl }/archive`, async (req, res) => {
   // parser.parse(path.join(process.env.PATH_TO_TEXT,'2021-02-01.txt'));
   await parser.loadText(process.env.PATH_TO_TEXT, true);
 
@@ -45,7 +47,7 @@ app.get('/archive', async (req, res) => {
 });
 
 
-app.get('/read/*', async (req, res) => {
+app.get(`${ rootUrl }/read/*`, async (req, res) => {
   let post;
   const pid = req.url.replace(/\/read\//,'');
   try {
@@ -67,7 +69,7 @@ app.get('/read/*', async (req, res) => {
   });  
 });
 
-app.get('/secret/edit/*', auth, async (req, res) => {
+app.get(`${ rootUrl }/secret/edit/*`, auth, async (req, res) => {
   let post;
   const pid = req.url.replace(/\/secret\/edit\//,'');
   try {
@@ -86,7 +88,7 @@ app.get('/secret/edit/*', auth, async (req, res) => {
   });  
 });
 
-app.get('/secret/delete/*', auth, async (req, res) => {
+app.get(`${ rootUrl }/secret/delete/*`, auth, async (req, res) => {
   let post;
   const pid = req.url.replace(/\/secret\/delete\//,'');
   try {
@@ -105,7 +107,7 @@ app.get('/secret/delete/*', auth, async (req, res) => {
   });  
 });
 
-app.post('/secret/delete', auth, async (req, res) => {
+app.post(`${ rootUrl }/secret/delete`, auth, async (req, res) => {
   const pid = req.body.id;
   try {
     const pathToFile = path.join(process.env.PATH_TO_TEXT,`${ pid }.txt`);
@@ -131,7 +133,7 @@ function formatDate(date) {
   return [year, month, day].join('-');
 }
 
-app.get('/secret/new', auth, async (req, res) => {
+app.get(`${ rootUrl }/secret/new`, auth, async (req, res) => {
 
   // what is today's date? format it into a post name
   const today = formatDate(new Date());
@@ -160,7 +162,7 @@ Your post goes here!`;
 
 
 
-app.post('/secret/update', auth, async (req, res) => {
+app.post(`${ rootUrl }/secret/update`, auth, async (req, res) => {
   const pid = req.body.id;
 
   let content = `---
@@ -180,7 +182,7 @@ ${ req.body.content }`;
 
 
 
-app.get('/secret', auth, async (req, res) => {
+app.get(`${ rootUrl }/secret`, auth, async (req, res) => {
   await parser.loadText(process.env.PATH_TO_TEXT, true);
 
   res.render('secrets/controlpanel', {
@@ -191,4 +193,4 @@ app.get('/secret', auth, async (req, res) => {
 });
 
  
-app.listen(3000);
+app.listen(process.env.PORT || 3000);
