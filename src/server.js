@@ -15,7 +15,7 @@ app.set('view engine', 'handlebars');
 
 const rootUrl = process.env.ROOT_URL;
 
-app.use(`${ rootUrl }/public`, express.static('public'))
+app.use(rootUrl, express.static('public'))
 app.use(bodyParser.urlencoded({ extended: true }));
 
 const auth = basicAuth({
