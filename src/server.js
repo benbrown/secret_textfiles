@@ -125,7 +125,7 @@ app.post(`${ rootUrl }/secret/delete`, auth, async (req, res) => {
     debug(err);
     return res.status(404).send('Missing');    
   }
-  res.redirect('/secret');
+  res.redirect(`${ rootUrl }/secret`);
 });
 
 function formatDate(date) {
@@ -165,7 +165,7 @@ Your post goes here!`;
    version++;
   }
   fs.writeFileSync(postPath, defaultContent);
-  res.redirect(`/secret/edit/${ pid }`);
+  res.redirect(`${ rootUrl }/secret/edit/${ pid }`);
 
 });
 
@@ -185,7 +185,7 @@ ${ req.body.content }`;
 
   let postPath = path.join(process.env.PATH_TO_TEXT,`${ pid }.txt`);
   fs.writeFileSync(postPath, content);
-  res.redirect(`/secret/edit/${ pid }`);
+  res.redirect(`${ rootUrl }/secret/edit/${ pid }`);
 
 });
 
