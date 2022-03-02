@@ -6,10 +6,11 @@ const path = require('path');
 require('dotenv').config()
 const app = express();
 const parser = require('./parser.js');
+const loadUsers = require('./auth.js');
+
 const fs = require('fs');
 const basicAuth = require('express-basic-auth')
 const RSS = require('rss-generator');
-
 app.engine('handlebars', exphbs());
 app.set('views', process.env.PATH_TO_TEMPLATES)
 app.set('view engine', 'handlebars');
@@ -20,8 +21,9 @@ const baseUrl = process.env.BASE_URL;
 app.use(rootUrl, express.static('public'))
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// require users to login based on the USERS env variable
 const auth = basicAuth({
-  users: { 'ben': 'secret' },
+  users: loadUsers(process.env.USERS),
   challenge: true,
 })
 
