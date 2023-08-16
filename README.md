@@ -66,3 +66,19 @@ There are 3 files involved in the design.
 
 CSS files and images can be put into the `public/` folder.
 
+### Hosting 
+
+When you are ready to deploy your website to a public URL, run the app using something like `pm2`. Then, host it behind an nginx proxy and make sure it is behind https!
+
+So if you had your site running with `blog` as the ROOT_URL option and the app is running on port 3000, a block like this inside your nginx config should work:
+
+```
+location ~ ^/blog {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection 'upgrade';
+    proxy_set_header Host $host;
+    proxy_cache_bypass $http_upgrade;
+}
+```
