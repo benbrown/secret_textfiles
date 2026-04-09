@@ -31,7 +31,29 @@
     {{/if}}
         
   </head>
-  <body>
+  <body{{#if streamAside}} class="stream-aside-body"{{/if}}>
+    {{#if streamAside}}
+    <div class="stream-page">
+      <div id="main" class="stream-main-col">
+        <header>
+          <h1><a href="{{rootUrl}}/">{{title}}</a></h1>
+        </header>
+
+        {{{body}}}
+      </div>
+
+      <aside class="stream-aside" aria-label="Site">
+        <nav class="stream-aside-nav">
+          <a href="{{rootUrl}}/">Home</a>
+          <a href="{{rootUrl}}/archive">Archive</a>
+        </nav>
+        {{#if siteDescription}}
+        <p class="stream-aside-desc">{{siteDescription}}</p>
+        {{/if}}
+        <p><a href="{{rootUrl}}/feed">RSS feed</a></p>
+      </aside>
+    </div>
+    {{else}}
     <div id="main">
       <header>
         <h1><a href="{{rootUrl}}/">{{title}}</a></h1>
@@ -40,5 +62,6 @@
       {{{body}}}
 
     </div>
+    {{/if}}
   </body>
 </html>

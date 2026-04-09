@@ -159,6 +159,26 @@ function groupPostsByDay(postsDesc) {
 }
 
 /**
+ * Flatten posts in the same order as the stream: newest day first, then per-day order from
+ * {@link groupPostsByDay}. Posts with no stream day key (rare) are appended, datestamp desc.
+ * @param {Array<{id: string, metadata: any}>} postsDesc e.g. parser.sortDesc('datestamp')
+ * @returns {Array<{id: string, metadata: any, rendered: string}>}
+ */
+function postsInStreamOrder(postsDesc) {
+  const { postsByDay, dayKeysDesc } = groupPostsByDay(postsDesc);
+  const inStream = new Set();
+  const out = [];
+  for (const key of dayKeysDesc) {
+    for (const p of postsByDay[key] || []) {
+      out.push(p);
+      inStream.add(p);
+    }
+  }
+  const rest = postsDesc.filter((p) => !inStream.has(p));
+  return out.concat(rest);
+}
+
+/**
  * Select whole days from newest until reaching min posts.
  * @param {Record<string, any[]>} postsByDay
  * @param {string[]} dayKeysDesc
@@ -205,7 +225,24 @@ function adjacentDays(dayKeysDesc, dayKey) {
  * @param {{rootUrl: string, title: string, headerTitle: string, days: Array<{key: string, posts: any[]}>, newerUrl?: string, olderUrl?: string, meta: any}} model
  */
 function renderStream(res, model) {
-  return res.render('stream', model);
+  return res.render('stream', {
+    ...model,
+    streamAside: true,
+    siteDescription: process.env.SITE_DESCRIPTION || '',
+  });
+}
+
+/**
+ * Render the home template (latest post or single read view) with the same aside as stream.
+ * @param {import('express').Response} res
+ * @param {Record<string, unknown>} model
+ */
+function renderHome(res, model) {
+  return res.render('home', {
+    ...model,
+    streamAside: true,
+    siteDescription: process.env.SITE_DESCRIPTION || '',
+  });
 }
 
 /**
@@ -294,13 +331,13 @@ app.get(`${ rootUrl }/`, async (req, res) => {
       type: 'website',
     });
 
-    return res.render('home', {
+    return renderHome(res, {
       rootUrl: rootUrl,
       title: process.env.SITE_NAME,
       post: latestPost,
       mostRecentPosts: mostRecentPosts,
       meta,
-    });  
+    });
 });
 
 app.get(`${rootUrl}/stream`, async (req, res) => {
@@ -323,11 +360,12 @@ app.get(`${ rootUrl }/archive`, async (req, res) => {
   // parser.parse(path.join(process.env.PATH_TO_TEXT,'2021-02-01.txt'));
   await parser.loadText(process.env.PATH_TO_TEXT, true);
 
+  const publicPosts = parser.sortDesc('datestamp');
   res.render('archive', {
 
     rootUrl: rootUrl,
     title: process.env.SITE_NAME,
-    posts: parser.sortDesc('datestamp'),
+    posts: postsInStreamOrder(publicPosts),
     meta: buildMeta({
       title: `${process.env.SITE_NAME} — Archive`,
       description: `Archive for ${process.env.SITE_NAME}.`,
@@ -341,16 +379,17 @@ app.get(`${ rootUrl }/feed`, async (req, res) => {
   await parser.loadText(process.env.PATH_TO_TEXT, true);
 
   const publicPosts = parser.sortDesc('datestamp');
+  const feedPosts = postsInStreamOrder(publicPosts);
 
   var feed = new RSS({
     title: process.env.SITE_NAME,
     // description: 'description',
     site_url: baseUrl,
-    pubDate: publicPosts[0].metadata.datestamp,
+    pubDate: feedPosts[0]?.metadata?.datestamp,
   });
  
 
-  publicPosts.forEach((post) => {
+  feedPosts.forEach((post) => {
     /* loop over data and add to feed */
     feed.item({
         title:  post.metadata.title,
@@ -382,7 +421,7 @@ app.get(`${ rootUrl }/read/*`, async (req, res) => {
   await parser.loadText(process.env.PATH_TO_TEXT, true);
   const mostRecentPosts = parser.sortDesc('datestamp').slice(0, process.env.RECENT_POSTS);
 
-  res.render('home', {
+  renderHome(res, {
     rootUrl: rootUrl,
     title: process.env.SITE_NAME,
     post: post,
@@ -393,7 +432,7 @@ app.get(`${ rootUrl }/read/*`, async (req, res) => {
       url: canonicalUrl(`${rootUrl}/read/${post?.id}`),
       type: 'article',
     }),
-  });  
+  });
 });
 
 app.get(`${ rootUrl }/secret/edit/*`, auth, async (req, res) => {
@@ -527,11 +566,12 @@ ${ req.body.content }`;
 app.get(`${ rootUrl }/secret`, auth, async (req, res) => {
   await parser.loadText(process.env.PATH_TO_TEXT, true);
 
+  const allPostsDesc = parser.sortDesc('datestamp', true, true);
   res.render('secrets/controlpanel', {
     rootUrl: rootUrl,
     layout: 'secret',
     title: process.env.SITE_NAME,
-    posts: parser.sortDesc('datestamp', true, true),
+    posts: postsInStreamOrder(allPostsDesc),
     meta: buildMeta({
       title: `${process.env.SITE_NAME} — Control Panel`,
       description: `Admin control panel.`,
