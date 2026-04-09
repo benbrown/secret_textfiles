@@ -45,6 +45,24 @@ function toDayKeyLocal(d) {
   return `${year}-${month}-${day}`;
 }
 
+/** Frontmatter dates like `2026-04-09` parse as UTC midnight; using them for stream headings avoids the wrong local calendar day. */
+const METADATA_DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Calendar day key (YYYY-MM-DD) for stream grouping; prefers the literal frontmatter date when it is date-only.
+ * @param {{ metadata?: { date?: unknown, datestamp?: Date } }} post
+ * @returns {string|null}
+ */
+function streamDayKeyFromPost(post) {
+  const rawDate = post?.metadata?.date;
+  if (typeof rawDate === 'string' && METADATA_DATE_ONLY_RE.test(rawDate.trim())) {
+    return rawDate.trim();
+  }
+  const ds = post?.metadata?.datestamp;
+  if (!ds) return null;
+  return toDayKeyLocal(new Date(ds));
+}
+
 /**
  * Strip HTML tags and normalize whitespace.
  * @param {string} html
@@ -95,16 +113,15 @@ function buildMeta(input) {
 }
 
 /**
- * Group posts by local day key (YYYY-MM-DD) and return day keys in desc order.
+ * Group posts by stream day key (YYYY-MM-DD) and return day keys in desc order.
  * @param {Array<{id: string, metadata: any, rendered: string}>} postsDesc
  * @returns {{postsByDay: Record<string, any[]>, dayKeysDesc: string[]}}
  */
 function groupPostsByDay(postsDesc) {
   const postsByDay = {};
   for (const post of postsDesc) {
-    const ds = post?.metadata?.datestamp;
-    if (!ds) continue;
-    const key = toDayKeyLocal(new Date(ds));
+    const key = streamDayKeyFromPost(post);
+    if (!key) continue;
     postsByDay[key] = postsByDay[key] || [];
     postsByDay[key].push(post);
   }
