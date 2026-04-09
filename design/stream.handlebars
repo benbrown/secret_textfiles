@@ -1,0 +1,29 @@
+{{#if headerTitle}}
+<h2>{{headerTitle}}</h2>
+{{/if}}
+
+{{#if newerUrl}}
+<p><a href="{{newerUrl}}">Newer posts</a></p>
+{{/if}}
+{{#if olderUrl}}
+<p><a href="{{olderUrl}}">Older posts</a></p>
+{{/if}}
+
+{{#each days}}
+  <h3>{{key}}</h3>
+  {{#each posts}}
+    <article>
+      <h4>{{metadata.title}}</h4>
+      <h5><a href="{{../../rootUrl}}/read/{{id}}">Link to this post</a></h5>
+      {{{rendered}}}
+    </article>
+  {{/each}}
+{{/each}}
+
+{{#if newerUrl}}
+<p><a href="{{newerUrl}}">Newer posts</a></p>
+{{/if}}
+{{#if olderUrl}}
+<p><a href="{{olderUrl}}">Older posts</a></p>
+{{/if}}
+
