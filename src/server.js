@@ -113,6 +113,23 @@ function buildMeta(input) {
 }
 
 /**
+ * Parse post id variants like `YYYY-MM-DD` or `YYYY-MM-DD-2` into a sortable sequence.
+ * For stream ordering we treat the numeric suffix as creation order within the day.
+ * @param {string} id
+ * @param {string} expectedDayKey
+ * @returns {{seq: number, raw: string}}
+ */
+function parseDayIdSequence(id, expectedDayKey) {
+  const raw = String(id || '');
+  const last = raw.split('/').pop() || raw;
+  const m = last.match(/^(\d{4}-\d{2}-\d{2})(?:-(\d+))?$/);
+  if (!m) return { seq: 0, raw };
+  if (m[1] !== expectedDayKey) return { seq: 0, raw };
+  const seq = m[2] ? parseInt(m[2], 10) : 1;
+  return { seq: Number.isFinite(seq) ? seq : 0, raw };
+}
+
+/**
  * Group posts by stream day key (YYYY-MM-DD) and return day keys in desc order.
  * @param {Array<{id: string, metadata: any, rendered: string}>} postsDesc
  * @returns {{postsByDay: Record<string, any[]>, dayKeysDesc: string[]}}
@@ -125,6 +142,18 @@ function groupPostsByDay(postsDesc) {
     postsByDay[key] = postsByDay[key] || [];
     postsByDay[key].push(post);
   }
+
+  // Ensure deterministic ordering within a day by filename/id sequence (YYYY-MM-DD[-N]).
+  for (const key of Object.keys(postsByDay)) {
+    postsByDay[key].sort((a, b) => {
+      const pa = parseDayIdSequence(a?.id, key);
+      const pb = parseDayIdSequence(b?.id, key);
+      if (pa.seq !== pb.seq) return pb.seq - pa.seq; // newest first
+      // Stable tie-breaker: id desc
+      return pa.raw > pb.raw ? -1 : pa.raw < pb.raw ? 1 : 0;
+    });
+  }
+
   const dayKeysDesc = Object.keys(postsByDay).sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
   return { postsByDay, dayKeysDesc };
 }
