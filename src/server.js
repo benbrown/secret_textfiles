@@ -256,9 +256,9 @@ function renderStreamLanding(res, postsDesc) {
   const olderUrl = selected.olderDay ? `${rootUrl}/stream/${selected.olderDay}` : undefined;
 
   const meta = buildMeta({
-    title: `${process.env.SITE_NAME} — Stream`,
-    description: `Latest posts from ${process.env.SITE_NAME}.`,
-    url: canonicalUrl(`${rootUrl}/stream`),
+    title: `${process.env.SITE_NAME}`,
+    description: `${process.env.SITE_DESCRIPTION}`,
+    url: canonicalUrl(`${rootUrl}`),
     type: 'website',
   });
 
