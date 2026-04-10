@@ -9,6 +9,7 @@ const parser = require('./parser.js');
 const loadUsers = require('./auth.js');
 
 const fs = require('fs');
+const yaml = require('yaml');
 const basicAuth = require('express-basic-auth')
 const RSS = require('rss-generator');
 app.engine('handlebars', exphbs());
@@ -500,6 +501,18 @@ app.post(`${ rootUrl }/secret/delete`, auth, async (req, res) => {
   res.redirect(`${ rootUrl }/secret`);
 });
 
+/**
+ * Build the full .txt file body with YAML front matter that round-trips safely
+ * (e.g. titles containing colons, quotes, or newlines).
+ * @param {{ title: string, date: string, draft: boolean }} metadata
+ * @param {string} markdownBody
+ * @returns {string}
+ */
+function serializePostFile(metadata, markdownBody) {
+  const frontMatter = yaml.stringify(metadata).trimEnd();
+  return `---\n${frontMatter}\n---\n\n${markdownBody}`;
+}
+
 function formatDate(date) {
   var d = new Date(date),
       month = '' + (d.getMonth() + 1),
@@ -546,14 +559,12 @@ Your post goes here!`;
 app.post(`${ rootUrl }/secret/update`, auth, async (req, res) => {
   const pid = req.body.id;
 
-  let content = `---
-title: ${ req.body.title }
-date: ${ req.body.date }
-draft: ${ req.body.draft || false }
----
-
-${ req.body.content }`;
-
+  const metadata = {
+    title: req.body.title,
+    date: req.body.date,
+    draft: req.body.draft === 'true' || req.body.draft === true,
+  };
+  const content = serializePostFile(metadata, req.body.content);
 
   let postPath = path.join(process.env.PATH_TO_TEXT,`${ pid }.txt`);
   fs.writeFileSync(postPath, content);
