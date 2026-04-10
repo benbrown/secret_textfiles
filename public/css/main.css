@@ -6,13 +6,13 @@ body {
   font-size: 16px;
   font-family: 'Courier New', Courier, monospace;
   padding: 1rem;
-  color: #333;
-  background-color: #F0F0F0;
+  color: #fff;
+  background-color: #000;
   line-height: 1.25rem;
 }
 
 header {
-  border-bottom: 1px solid #CCC;
+  border-bottom: 1px solid #FFF;
   padding: 0.5rem 0;
 }
 
