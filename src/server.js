@@ -381,12 +381,13 @@ app.get(`${ rootUrl }/feed`, async (req, res) => {
 
   const publicPosts = parser.sortDesc('datestamp');
   const feedPosts = postsInStreamOrder(publicPosts);
+  const feedPubDate = feedPosts[0]?.metadata?.published_at_utc || feedPosts[0]?.metadata?.datestamp;
 
   var feed = new RSS({
     title: process.env.SITE_NAME,
     // description: 'description',
     site_url: baseUrl,
-    pubDate: feedPosts[0]?.metadata?.datestamp,
+    pubDate: feedPubDate,
   });
  
 
@@ -398,7 +399,7 @@ app.get(`${ rootUrl }/feed`, async (req, res) => {
         url: `${ baseUrl }${ rootUrl }/read/${ post.id }`, // link to the item
         // categories: ['Category 1','Category 2','Category 3','Category 4'], // optional - array of item categories
         // author: 'Guest Author', // optional - defaults to feed author property
-        date: post.metadata.date, // any format that js Date can parse.
+        date: post.metadata.published_at_utc || post.metadata.date, // any format that js Date can parse.
     });
   });
 
@@ -504,13 +505,22 @@ app.post(`${ rootUrl }/secret/delete`, auth, async (req, res) => {
 /**
  * Build the full .txt file body with YAML front matter that round-trips safely
  * (e.g. titles containing colons, quotes, or newlines).
- * @param {{ title: string, date: string, draft: boolean }} metadata
+ * @param {{ title: string, date: string, draft: boolean, published_at_utc?: string }} metadata
  * @param {string} markdownBody
  * @returns {string}
  */
 function serializePostFile(metadata, markdownBody) {
   const frontMatter = yaml.stringify(metadata).trimEnd();
   return `---\n${frontMatter}\n---\n\n${markdownBody}`;
+}
+
+/**
+ * Current UTC timestamp as a standard JS ISO string.
+ * Example: 2026-04-23T19:12:05.123Z
+ * @returns {string}
+ */
+function nowUtcIsoString() {
+  return new Date().toISOString();
 }
 
 function formatDate(date) {
@@ -559,11 +569,29 @@ Your post goes here!`;
 app.post(`${ rootUrl }/secret/update`, auth, async (req, res) => {
   const pid = req.body.id;
 
+  let priorMetadata = null;
+  try {
+    const priorPath = path.join(process.env.PATH_TO_TEXT, `${ pid }.txt`);
+    const priorPost = await parser.parse(priorPath);
+    priorMetadata = priorPost?.metadata || null;
+  } catch (err) {
+    // Best-effort: if prior parse fails, proceed without prior metadata.
+    priorMetadata = null;
+  }
+
   const metadata = {
     title: req.body.title,
     date: req.body.date,
     draft: req.body.draft === 'true' || req.body.draft === true,
   };
+
+  // One-time publish timestamp: set only on first transition from draft -> non-draft.
+  if (priorMetadata?.published_at_utc) {
+    metadata.published_at_utc = priorMetadata.published_at_utc;
+  } else if (metadata.draft !== true && priorMetadata?.draft === true) {
+    metadata.published_at_utc = nowUtcIsoString();
+  }
+
   const content = serializePostFile(metadata, req.body.content);
 
   let postPath = path.join(process.env.PATH_TO_TEXT,`${ pid }.txt`);
