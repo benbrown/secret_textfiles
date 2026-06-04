@@ -99,8 +99,48 @@ function canonicalUrl(pathname) {
 }
 
 /**
+ * Returns the `src` of the first `<img>` in rendered post HTML, or null if none.
+ * @param {string} html
+ * @returns {string | null}
+ */
+function firstImageSrcFromHtml(html) {
+  const match = String(html || '').match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i);
+  return match ? match[1] : null;
+}
+
+/**
+ * Turns a post image `src` into an absolute URL for Open Graph / Twitter.
+ * @param {string} src
+ * @returns {string | undefined}
+ */
+function absoluteImageUrl(src) {
+  const trimmed = String(src || '').trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('//')) {
+    return `https:${trimmed}`;
+  }
+  const pathPart = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return `${baseUrl}${pathPart}`;
+}
+
+/**
+ * First image in post HTML as an absolute URL suitable for social meta tags.
+ * @param {string} html
+ * @returns {string | undefined}
+ */
+function firstMetaImageFromHtml(html) {
+  const src = firstImageSrcFromHtml(html);
+  return src ? absoluteImageUrl(src) : undefined;
+}
+
+/**
  * Build a meta object for layout social tags.
- * @param {{title?: string, description?: string, url: string, type?: string}} input
+ * @param {{title?: string, description?: string, url: string, type?: string, image?: string}} input
  * @returns {{title: string, description?: string, url: string, type: string, image?: string}}
  */
 function buildMeta(input) {
@@ -109,7 +149,7 @@ function buildMeta(input) {
     description: input.description,
     url: input.url,
     type: input.type || 'website',
-    image: socialImageUrl,
+    image: input.image || socialImageUrl,
   };
 }
 
@@ -433,6 +473,7 @@ app.get(`${ rootUrl }/read/*`, async (req, res) => {
       description: excerptFromHtml(post?.rendered, 200),
       url: canonicalUrl(`${rootUrl}/read/${post?.id}`),
       type: 'article',
+      image: firstMetaImageFromHtml(post?.rendered),
     }),
   });
 });
