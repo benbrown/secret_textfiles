@@ -6,8 +6,9 @@ const path = require('path');
 const MarkdownIt = require('markdown-it');
 
 /**
- * Markdown with links, images, and fenced / inline code. Uses the `zero` preset
- * plus fence, backticks (inline code), link, and image (no arbitrary HTML).
+ * Markdown with links, images, blockquotes, and fenced / inline code. Uses the
+ * `zero` preset plus fence, backticks (inline code), link, image, and blockquote
+ * (no arbitrary HTML).
  * @see https://markdown-it.github.io/markdown-it/
  * @returns {MarkdownIt}
  */
@@ -16,7 +17,7 @@ function createMarkdown() {
     html: false,
     breaks: false,
     linkify: false,
-  }).enable(['link', 'image', 'fence', 'backticks']);
+  }).enable(['link', 'image', 'fence', 'backticks', 'blockquote']);
 
   const linkOpen = md.renderer.rules.link_open;
   md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
