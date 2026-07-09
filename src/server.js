@@ -633,7 +633,8 @@ app.post(`${ rootUrl }/secret/update`, auth, async (req, res) => {
     metadata.published_at_utc = nowUtcIsoString();
   }
 
-  const content = serializePostFile(metadata, req.body.content);
+  const markdownBody = await parser.expandPhotoDirectivesInMarkdown(req.body.content);
+  const content = serializePostFile(metadata, markdownBody);
 
   let postPath = path.join(process.env.PATH_TO_TEXT,`${ pid }.txt`);
   fs.writeFileSync(postPath, content);

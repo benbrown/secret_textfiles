@@ -48,6 +48,12 @@ const YOUTUBE_HOSTS = new Set([
   'youtube-nocookie.com',
 ]);
 
+/** Hostnames allowed for photo: embeds (normalized: no leading `www.`). */
+const PHOTO_HOSTS = new Set(['photos.benbrown.com']);
+
+/** @type {Map<string, {image: string, description: string} | null>} */
+const photoMetaCache = new Map();
+
 /**
  * Returns true if the string is a plausible YouTube video id (11 chars).
  * @param {string | null | undefined} id
@@ -140,6 +146,153 @@ function replaceVideoDirectivesInHtml(html) {
 }
 
 /**
+ * Decodes common HTML entities in meta tag content.
+ * @param {string} s
+ * @returns {string}
+ */
+function decodeHtmlEntities(s) {
+  return String(s)
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num, 10)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+/**
+ * Returns the value of an Open Graph meta tag from raw HTML, or null if missing.
+ * @param {string} html
+ * @param {string} property
+ * @returns {string | null}
+ */
+function parseOgMetaContent(html, property) {
+  const escaped = property.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const patterns = [
+    new RegExp(`<meta\\s+property=["']${escaped}["']\\s+content=["']([^"']*)["']`, 'i'),
+    new RegExp(`<meta\\s+content=["']([^"']*)["']\\s+property=["']${escaped}["']`, 'i'),
+  ];
+  for (const re of patterns) {
+    const match = html.match(re);
+    if (match) {
+      return decodeHtmlEntities(match[1]);
+    }
+  }
+  return null;
+}
+
+/**
+ * Parses a user-supplied URL and returns a canonical photos.benbrown.com page URL, or null.
+ * @param {string} raw
+ * @returns {string | null}
+ */
+function normalizePhotoPageUrl(raw) {
+  const trimmed = raw.replace(/^<|>$/g, '').trim();
+  if (!trimmed) {
+    return null;
+  }
+  const href = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  let url;
+  try {
+    url = new URL(href);
+  } catch {
+    return null;
+  }
+  const host = url.hostname.replace(/^www\./i, '').toLowerCase();
+  if (!PHOTO_HOSTS.has(host)) {
+    return null;
+  }
+  return `https://photos.benbrown.com${url.pathname}`;
+}
+
+/**
+ * Fetches og:image and og:description from a photos.benbrown.com page.
+ * @param {string} pageUrl
+ * @returns {Promise<{image: string, description: string} | null>}
+ */
+async function fetchPhotoMetadata(pageUrl) {
+  if (photoMetaCache.has(pageUrl)) {
+    return photoMetaCache.get(pageUrl);
+  }
+  let html;
+  try {
+    const res = await fetch(pageUrl, {
+      headers: { 'User-Agent': 'secret_textfiles/1.0' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+      photoMetaCache.set(pageUrl, null);
+      return null;
+    }
+    html = await res.text();
+  } catch (err) {
+    debug('photo metadata fetch failed', pageUrl, err);
+    photoMetaCache.set(pageUrl, null);
+    return null;
+  }
+  const image = parseOgMetaContent(html, 'og:image');
+  const description = parseOgMetaContent(html, 'og:description') || '';
+  if (!image) {
+    photoMetaCache.set(pageUrl, null);
+    return null;
+  }
+  const meta = { image, description };
+  photoMetaCache.set(pageUrl, meta);
+  return meta;
+}
+
+/**
+ * Escapes characters that would break Markdown image alt text.
+ * @param {string} s
+ * @returns {string}
+ */
+function escapeMarkdownAlt(s) {
+  return String(s)
+    .replace(/\\/g, '\\\\')
+    .replace(/\[/g, '\\[')
+    .replace(/\]/g, '\\]');
+}
+
+/**
+ * Builds a linked image in Markdown for an embedded photo.
+ * @param {string} pageUrl
+ * @param {string} imageUrl
+ * @param {string} alt
+ * @returns {string}
+ */
+function buildPhotoMarkdown(pageUrl, imageUrl, alt) {
+  const altEscaped = escapeMarkdownAlt(alt);
+  return `[![${altEscaped}](${imageUrl})](${pageUrl})`;
+}
+
+/**
+ * Replaces lone `photo: <url>` lines with linked image Markdown fetched from the photo page
+ * Open Graph metadata. Intended for save-time expansion, not display.
+ * @param {string} markdownBody
+ * @returns {Promise<string>}
+ */
+async function expandPhotoDirectivesInMarkdown(markdownBody) {
+  const regex = /^photo:\s*(.+?)\s*$/gm;
+  let result = markdownBody;
+  for (const match of markdownBody.matchAll(regex)) {
+    const full = match[0];
+    const rawUrl = match[1].trim();
+    const pageUrl = normalizePhotoPageUrl(rawUrl);
+    if (!pageUrl) {
+      continue;
+    }
+    const meta = await fetchPhotoMetadata(pageUrl);
+    if (!meta) {
+      continue;
+    }
+    const replacement = buildPhotoMarkdown(pageUrl, meta.image, meta.description);
+    result = result.replace(full, replacement);
+  }
+  return result;
+}
+
+/**
  * Renders minimal Markdown to HTML, then substitutes lone `video:` lines with embeds.
  * @param {string} markdownBody
  * @returns {string}
@@ -150,6 +303,7 @@ function renderPostHtml(markdownBody) {
 
 const parser = {
   _cache: [],
+  expandPhotoDirectivesInMarkdown,
   sortDesc: (fieldName, alwaysInclude, includeDrafts) => {
       return parser._cache.filter((p)=>{return ((p.metadata[fieldName] || alwaysInclude) && (includeDrafts || p.metadata.draft !== true)) }).sort((a, b) => {
         if (a.metadata[fieldName] > b.metadata[fieldName]) {
