@@ -450,7 +450,7 @@ app.get(`${ rootUrl }/feed`, async (req, res) => {
 
 app.get(`${ rootUrl }/read/*`, async (req, res) => {
   let post;
-  const pid = path.basename(req.url); //.replace(/\/read\//,'');
+  const pid = path.basename(req.path); //.replace(/\/read\//,'');
   try {
     const pathToFile = path.join(process.env.PATH_TO_TEXT,`${ pid }.txt`);
     debug('path to file', pathToFile);
@@ -480,7 +480,7 @@ app.get(`${ rootUrl }/read/*`, async (req, res) => {
 
 app.get(`${ rootUrl }/secret/edit/*`, auth, async (req, res) => {
   let post;
-  const pid = path.basename(req.url); // .replace(/\/secret\/edit\//,'');
+  const pid = path.basename(req.path); // .replace(/\/secret\/edit\//,'');
   try {
     const pathToFile = path.join(process.env.PATH_TO_TEXT,`${ pid }.txt`);
     debug('path to file', pathToFile);
@@ -506,7 +506,7 @@ app.get(`${ rootUrl }/secret/edit/*`, auth, async (req, res) => {
 
 app.get(`${ rootUrl }/secret/delete/*`, auth, async (req, res) => {
   let post;
-  const pid = path.basename(req.url);
+  const pid = path.basename(req.path);
   // .replace(/\/secret\/delete\//,'');
   try {
     const pathToFile = path.join(process.env.PATH_TO_TEXT,`${ pid }.txt`);
