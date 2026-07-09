@@ -495,6 +495,7 @@ app.get(`${ rootUrl }/secret/edit/*`, auth, async (req, res) => {
     title: process.env.SITE_NAME,
     layout: 'secret',
     post: post,
+    photoErrors: parseInt(req.query.photo_errors, 10) || 0,
     meta: buildMeta({
       title: `${process.env.SITE_NAME} — Edit`,
       description: `Edit post ${pid}.`,
@@ -633,12 +634,14 @@ app.post(`${ rootUrl }/secret/update`, auth, async (req, res) => {
     metadata.published_at_utc = nowUtcIsoString();
   }
 
-  const markdownBody = await parser.expandPhotoDirectivesInMarkdown(req.body.content);
+  const { markdown: markdownBody, failures: photoFailures } =
+    await parser.expandPhotoDirectivesInMarkdown(req.body.content);
   const content = serializePostFile(metadata, markdownBody);
 
   let postPath = path.join(process.env.PATH_TO_TEXT,`${ pid }.txt`);
   fs.writeFileSync(postPath, content);
-  res.redirect(`${ rootUrl }/secret/edit/${ pid }`);
+  const photoErrors = photoFailures.length ? `?photo_errors=${photoFailures.length}` : '';
+  res.redirect(`${rootUrl}/secret/edit/${pid}${photoErrors}`);
 
 });
 

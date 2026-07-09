@@ -1,4 +1,6 @@
 const fs = require('fs');
+const http = require('http');
+const https = require('https');
 const yaml = require('yaml');
 const debug = require('debug')('textfiles:parser');
 const glob = require('glob');
@@ -207,6 +209,38 @@ function normalizePhotoPageUrl(raw) {
 }
 
 /**
+ * Fetches a URL and returns the response body as a string.
+ * @param {string} urlString
+ * @param {number} [timeoutMs]
+ * @returns {Promise<string>}
+ */
+function fetchPageHtml(urlString, timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(urlString);
+    const lib = url.protocol === 'https:' ? https : http;
+    const req = lib.get(
+      url,
+      { headers: { 'User-Agent': 'secret_textfiles/1.0', Accept: 'text/html' } },
+      (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          fetchPageHtml(new URL(res.headers.location, url).href, timeoutMs).then(resolve).catch(reject);
+          return;
+        }
+        if (res.statusCode !== 200) {
+          reject(new Error(`HTTP ${res.statusCode}`));
+          return;
+        }
+        const chunks = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+      },
+    );
+    req.on('error', reject);
+    req.setTimeout(timeoutMs, () => req.destroy(new Error('timeout')));
+  });
+}
+
+/**
  * Fetches og:image and og:description from a photos.benbrown.com page.
  * @param {string} pageUrl
  * @returns {Promise<{image: string, description: string} | null>}
@@ -217,24 +251,15 @@ async function fetchPhotoMetadata(pageUrl) {
   }
   let html;
   try {
-    const res = await fetch(pageUrl, {
-      headers: { 'User-Agent': 'secret_textfiles/1.0' },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) {
-      photoMetaCache.set(pageUrl, null);
-      return null;
-    }
-    html = await res.text();
+    html = await fetchPageHtml(pageUrl);
   } catch (err) {
     debug('photo metadata fetch failed', pageUrl, err);
-    photoMetaCache.set(pageUrl, null);
     return null;
   }
   const image = parseOgMetaContent(html, 'og:image');
   const description = parseOgMetaContent(html, 'og:description') || '';
   if (!image) {
-    photoMetaCache.set(pageUrl, null);
+    debug('photo metadata missing og:image', pageUrl);
     return null;
   }
   const meta = { image, description };
@@ -270,26 +295,32 @@ function buildPhotoMarkdown(pageUrl, imageUrl, alt) {
  * Replaces lone `photo: <url>` lines with linked image Markdown fetched from the photo page
  * Open Graph metadata. Intended for save-time expansion, not display.
  * @param {string} markdownBody
- * @returns {Promise<string>}
+ * @returns {Promise<{markdown: string, failures: string[]}>}
  */
 async function expandPhotoDirectivesInMarkdown(markdownBody) {
-  const regex = /^photo:\s*(.+?)\s*$/gm;
+  if (!markdownBody) {
+    return { markdown: markdownBody || '', failures: [] };
+  }
+  const regex = /^\s*photo:\s*(.+?)\s*$/gm;
+  const failures = [];
   let result = markdownBody;
   for (const match of markdownBody.matchAll(regex)) {
     const full = match[0];
-    const rawUrl = match[1].trim();
+    const rawUrl = match[1].trim().replace(/\r$/, '');
     const pageUrl = normalizePhotoPageUrl(rawUrl);
     if (!pageUrl) {
+      failures.push(rawUrl);
       continue;
     }
     const meta = await fetchPhotoMetadata(pageUrl);
     if (!meta) {
+      failures.push(pageUrl);
       continue;
     }
     const replacement = buildPhotoMarkdown(pageUrl, meta.image, meta.description);
     result = result.replace(full, replacement);
   }
-  return result;
+  return { markdown: result, failures };
 }
 
 /**
