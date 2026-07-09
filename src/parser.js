@@ -301,26 +301,31 @@ async function expandPhotoDirectivesInMarkdown(markdownBody) {
   if (!markdownBody) {
     return { markdown: markdownBody || '', failures: [] };
   }
-  const regex = /^\s*photo:\s*(.+?)\s*$/gm;
+  const lines = markdownBody.split(/\r?\n/);
   const failures = [];
-  let result = markdownBody;
-  for (const match of markdownBody.matchAll(regex)) {
-    const full = match[0];
-    const rawUrl = match[1].trim().replace(/\r$/, '');
+  const out = [];
+  for (const line of lines) {
+    const m = line.match(/^\s*photo:\s*(.+)\s*$/);
+    if (!m) {
+      out.push(line);
+      continue;
+    }
+    const rawUrl = m[1].trim();
     const pageUrl = normalizePhotoPageUrl(rawUrl);
     if (!pageUrl) {
       failures.push(rawUrl);
+      out.push(line);
       continue;
     }
     const meta = await fetchPhotoMetadata(pageUrl);
     if (!meta) {
       failures.push(pageUrl);
+      out.push(line);
       continue;
     }
-    const replacement = buildPhotoMarkdown(pageUrl, meta.image, meta.description);
-    result = result.replace(full, replacement);
+    out.push(buildPhotoMarkdown(pageUrl, meta.image, meta.description));
   }
-  return { markdown: result, failures };
+  return { markdown: out.join('\n'), failures };
 }
 
 /**
