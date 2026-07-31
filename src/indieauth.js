@@ -13,23 +13,21 @@ const authCodes = new Map();
 const accessTokens = new Map();
 
 /**
- * Normalize a URL for IndieAuth identity comparison.
+ * Normalize a URL for IndieAuth identity comparison (host + path only).
  * @param {string} url
  * @returns {string}
  */
 function normalizeIdentityUrl(url) {
   try {
     const parsed = new URL(url);
-    parsed.hash = '';
-    parsed.search = '';
     let pathname = parsed.pathname || '/';
     if (!pathname.endsWith('/')) {
       pathname += '/';
     }
-    parsed.pathname = pathname;
-    return parsed.href;
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    return `${host}${pathname}`;
   } catch {
-    return String(url || '').trim();
+    return String(url || '').trim().toLowerCase();
   }
 }
 
@@ -121,6 +119,25 @@ function oauthError(res, status, error, description) {
 }
 
 /**
+ * Send an OAuth error, preferring HTML for browser authorization requests.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {number} status
+ * @param {string} error
+ * @param {string} [description]
+ */
+function sendOAuthError(req, res, status, error, description) {
+  const acceptsHtml = String(req.headers.accept || '').includes('text/html');
+  if (acceptsHtml && req.method === 'GET') {
+    return res.status(status).type('html').send(
+      `<!DOCTYPE html><html><body><h1>Authorization failed</h1>` +
+      `<p>${description || error}</p></body></html>`
+    );
+  }
+  return oauthError(res, status, error, description);
+}
+
+/**
  * Validate authorization request query parameters.
  * @param {import('express').Request} req
  * @param {string} me
@@ -206,7 +223,7 @@ function createIndieAuthRouter(options) {
   function issueAuthorizationCode(req, res) {
     const validationError = validateAuthorizeRequest(req, options.me);
     if (validationError) {
-      return oauthError(res, 400, 'invalid_request', validationError);
+      return sendOAuthError(req, res, 400, 'invalid_request', validationError);
     }
 
     const redirectUri = String(req.query.redirect_uri);
@@ -232,7 +249,7 @@ function createIndieAuthRouter(options) {
   router.get('/authorize', auth, (req, res) => {
     const validationError = validateAuthorizeRequest(req, options.me);
     if (validationError) {
-      return oauthError(res, 400, 'invalid_request', validationError);
+      return sendOAuthError(req, res, 400, 'invalid_request', validationError);
     }
 
     if (req.query.approved === '1') {
@@ -262,7 +279,7 @@ function createIndieAuthRouter(options) {
 
     const validationError = validateAuthorizeRequest(req, options.me);
     if (validationError) {
-      return oauthError(res, 400, 'invalid_request', validationError);
+      return sendOAuthError(req, res, 400, 'invalid_request', validationError);
     }
 
     return issueAuthorizationCode(req, res);

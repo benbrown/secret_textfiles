@@ -31,7 +31,22 @@ const minPostsPerPage = (() => {
   return Number.isFinite(n) && n > 0 ? n : 10;
 })();
 const socialImageUrl = process.env.SOCIAL_IMAGE_URL;
-const authBaseUrl = `${baseUrl}${rootUrl}`.replace(/\/$/, '');
+
+/**
+ * Upgrade http→https for public site origins (not localhost).
+ * @param {string} siteBaseUrl
+ * @returns {string}
+ */
+function publicSiteOrigin(siteBaseUrl) {
+  const trimmed = String(siteBaseUrl || '').trim().replace(/\/$/, '');
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(trimmed)) {
+    return trimmed;
+  }
+  return trimmed.replace(/^http:\/\//i, 'https://');
+}
+
+const publicOrigin = publicSiteOrigin(baseUrl);
+const authBaseUrl = `${publicOrigin}${rootUrl}`.replace(/\/$/, '');
 const me = `${authBaseUrl}/`;
 
 app.locals.authBaseUrl = authBaseUrl;
@@ -53,7 +68,7 @@ app.use(`${rootUrl}/auth`, createIndieAuthRouter({
   rootUrl,
 }));
 app.use(`${rootUrl}/micropub`, createMicropubRouter({
-  baseUrl,
+  baseUrl: publicOrigin,
   rootUrl,
   textDir: process.env.PATH_TO_TEXT,
   getAccessTokenFromRequest,
