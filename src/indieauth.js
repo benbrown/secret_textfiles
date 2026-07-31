@@ -187,6 +187,33 @@ function validateAuthorizeRequest(req, me) {
   return null;
 }
 
+/** OAuth query keys preserved through the consent form. */
+const OAUTH_PARAM_KEYS = [
+  'response_type',
+  'client_id',
+  'redirect_uri',
+  'state',
+  'code_challenge',
+  'code_challenge_method',
+  'me',
+  'scope',
+];
+
+/**
+ * Collect string OAuth parameters from a request for the consent form.
+ * @param {import('express').Request} req
+ * @returns {Record<string, string>}
+ */
+function collectOAuthParams(req) {
+  return OAUTH_PARAM_KEYS.reduce((acc, key) => {
+    const value = req.query[key];
+    if (typeof value === 'string' && value) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+}
+
 /**
  * Build redirect URL with authorization code.
  * @param {string} redirectUri
@@ -262,14 +289,7 @@ function createIndieAuthRouter(options) {
       clientId: req.query.client_id,
       scopes: GRANTED_SCOPES,
       rootUrl: options.rootUrl,
-      oauthQuery: new URLSearchParams(
-        Object.entries(req.query).reduce((acc, [key, value]) => {
-          if (typeof value === 'string') {
-            acc[key] = value;
-          }
-          return acc;
-        }, {})
-      ).toString(),
+      oauthParams: collectOAuthParams(req),
     });
   });
 

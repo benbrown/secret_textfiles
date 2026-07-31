@@ -13,7 +13,10 @@
         <strong>{{siteName}}</strong>.
       </p>
       <p>Scopes: {{scopes}}</p>
-      <form method="post" action="{{rootUrl}}/auth/authorize?{{oauthQuery}}">
+      <form method="post" action="{{rootUrl}}/auth/authorize">
+        {{#each oauthParams}}
+        <input type="hidden" name="{{@key}}" value="{{this}}" />
+        {{/each}}
         <input type="hidden" name="approved" value="1" />
         <button type="submit">Allow</button>
       </form>
