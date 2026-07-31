@@ -7,9 +7,16 @@ require('dotenv').config()
 const app = express();
 const parser = require('./parser.js');
 const loadUsers = require('./auth.js');
+const { createIndieAuthRouter, getAccessTokenFromRequest } = require('./indieauth.js');
+const { createMicropubRouter } = require('./micropub.js');
+const {
+  serializePostFile,
+  formatDate,
+  allocatePostPath,
+  mergePublishMetadata,
+} = require('./posts.js');
 
 const fs = require('fs');
-const yaml = require('yaml');
 const basicAuth = require('express-basic-auth')
 const RSS = require('rss-generator');
 app.engine('handlebars', exphbs());
@@ -24,15 +31,33 @@ const minPostsPerPage = (() => {
   return Number.isFinite(n) && n > 0 ? n : 10;
 })();
 const socialImageUrl = process.env.SOCIAL_IMAGE_URL;
+const authBaseUrl = `${baseUrl}${rootUrl}`.replace(/\/$/, '');
+const me = `${authBaseUrl}/`;
+
+app.locals.authBaseUrl = authBaseUrl;
 
 app.use(rootUrl, express.static('public'))
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // require users to login based on the USERS env variable
+const users = loadUsers(process.env.USERS);
 const auth = basicAuth({
-  users: loadUsers(process.env.USERS),
+  users,
   challenge: true,
 })
+
+app.use(`${rootUrl}/auth`, createIndieAuthRouter({
+  me,
+  users,
+  siteName: process.env.SITE_NAME,
+  rootUrl,
+}));
+app.use(`${rootUrl}/micropub`, createMicropubRouter({
+  baseUrl,
+  rootUrl,
+  textDir: process.env.PATH_TO_TEXT,
+  getAccessTokenFromRequest,
+}));
 
 /**
  * Convert a Date to a YYYY-MM-DD key using local time.
@@ -544,41 +569,6 @@ app.post(`${ rootUrl }/secret/delete`, auth, async (req, res) => {
   res.redirect(`${ rootUrl }/secret`);
 });
 
-/**
- * Build the full .txt file body with YAML front matter that round-trips safely
- * (e.g. titles containing colons, quotes, or newlines).
- * @param {{ title: string, date: string, draft: boolean, published_at_utc?: string }} metadata
- * @param {string} markdownBody
- * @returns {string}
- */
-function serializePostFile(metadata, markdownBody) {
-  const frontMatter = yaml.stringify(metadata).trimEnd();
-  return `---\n${frontMatter}\n---\n\n${markdownBody}`;
-}
-
-/**
- * Current UTC timestamp as a standard JS ISO string.
- * Example: 2026-04-23T19:12:05.123Z
- * @returns {string}
- */
-function nowUtcIsoString() {
-  return new Date().toISOString();
-}
-
-function formatDate(date) {
-  var d = new Date(date),
-      month = '' + (d.getMonth() + 1),
-      day = '' + d.getDate(),
-      year = d.getFullYear();
-
-  if (month.length < 2) 
-      month = '0' + month;
-  if (day.length < 2) 
-      day = '0' + day;
-
-  return [year, month, day].join('-');
-}
-
 app.get(`${ rootUrl }/secret/new`, auth, async (req, res) => {
 
   // what is today's date? format it into a post name
@@ -592,15 +582,7 @@ draft: true
 
 Your post goes here!`;
 
-  // TODO: make sure no overwrite!
-  let postPath = path.join(process.env.PATH_TO_TEXT,`${ today }.txt`);
-  let version = 2;
-  let pid = today;
-  while (fs.existsSync(postPath)) {
-    postPath = path.join(process.env.PATH_TO_TEXT,`${ today }-${ version }.txt`);
-    pid = `${ today }-${ version }`;
-   version++;
-  }
+  const { postPath, pid } = allocatePostPath(process.env.PATH_TO_TEXT, today);
   fs.writeFileSync(postPath, defaultContent);
   res.redirect(`${ rootUrl }/secret/edit/${ pid }`);
 
@@ -621,18 +603,11 @@ app.post(`${ rootUrl }/secret/update`, auth, async (req, res) => {
     priorMetadata = null;
   }
 
-  const metadata = {
+  const metadata = mergePublishMetadata({
     title: req.body.title,
     date: req.body.date,
     draft: req.body.draft === 'true' || req.body.draft === true,
-  };
-
-  // One-time publish timestamp: set only on first transition from draft -> non-draft.
-  if (priorMetadata?.published_at_utc) {
-    metadata.published_at_utc = priorMetadata.published_at_utc;
-  } else if (metadata.draft !== true && priorMetadata?.draft === true) {
-    metadata.published_at_utc = nowUtcIsoString();
-  }
+  }, priorMetadata);
 
   const { markdown: markdownBody, failures: photoFailures } =
     await parser.expandPhotoDirectivesInMarkdown(req.body.content);

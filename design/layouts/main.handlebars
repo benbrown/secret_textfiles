@@ -4,6 +4,9 @@
     <title>{{#if meta.title}}{{meta.title}} - {{title}}{{else}}{{title}}{{/if}}</title>
     <link rel="stylesheet" href="{{rootUrl}}/css/main.css" />
     <link rel="alternate" type="application/rss+xml" title="RSS Feed for {{title}}" href="{{rootUrl}}/feed" />
+    <link rel="authorization_endpoint" href="{{authBaseUrl}}/auth/authorize">
+    <link rel="token_endpoint" href="{{authBaseUrl}}/auth/token">
+    <link rel="micropub" href="{{authBaseUrl}}/micropub">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <!-- Social Media Meta Tags -->

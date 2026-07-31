@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Authorize App — {{siteName}}</title>
+    <link rel="stylesheet" href="{{rootUrl}}/css/main.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+  <body>
+    <div id="main">
+      <h1>Authorize application</h1>
+      <p>
+        <strong>{{clientId}}</strong> is requesting permission to create and update posts on
+        <strong>{{siteName}}</strong>.
+      </p>
+      <p>Scopes: {{scopes}}</p>
+      <form method="post" action="{{rootUrl}}/auth/authorize?{{oauthQuery}}">
+        <input type="hidden" name="approved" value="1" />
+        <button type="submit">Allow</button>
+      </form>
+    </div>
+  </body>
+</html>
