@@ -6,7 +6,7 @@ const AUTH_CODE_TTL_MS = 10 * 60 * 1000;
 const ACCESS_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const GRANTED_SCOPES = 'create update';
 
-/** @type {Map<string, { codeChallenge: string, method: string, redirectUri: string, clientId: string, scope: string, me: string, expiresAt: number }>} */
+/** @type {Map<string, { codeChallenge: string | null, method: string | null, redirectUri: string, clientId: string, scope: string, me: string, expiresAt: number }>} */
 const authCodes = new Map();
 
 /** @type {Map<string, { scope: string, me: string, expiresAt: number }>} */
@@ -165,11 +165,13 @@ function validateAuthorizeRequest(req, me) {
   if (!state || typeof state !== 'string') {
     return 'state is required';
   }
-  if (!codeChallenge || typeof codeChallenge !== 'string') {
-    return 'code_challenge is required';
-  }
-  if (codeChallengeMethod !== 'S256') {
+
+  const hasPkce = typeof codeChallenge === 'string' && codeChallenge.length > 0;
+  if (hasPkce && codeChallengeMethod !== 'S256') {
     return 'code_challenge_method must be S256';
+  }
+  if (!hasPkce && codeChallengeMethod) {
+    return 'code_challenge is required when code_challenge_method is provided';
   }
 
   const requestMe = req.query.me;
@@ -256,8 +258,9 @@ function createIndieAuthRouter(options) {
     const redirectUri = String(req.query.redirect_uri);
     const clientId = String(req.query.client_id);
     const state = String(req.query.state);
-    const codeChallenge = String(req.query.code_challenge);
-    const codeChallengeMethod = String(req.query.code_challenge_method);
+    const hasPkce = typeof req.query.code_challenge === 'string' && req.query.code_challenge.length > 0;
+    const codeChallenge = hasPkce ? String(req.query.code_challenge) : null;
+    const codeChallengeMethod = hasPkce ? String(req.query.code_challenge_method) : null;
 
     const code = crypto.randomBytes(32).toString('hex');
     authCodes.set(code, {
@@ -318,7 +321,7 @@ function createIndieAuthRouter(options) {
     const clientId = req.body.client_id;
     const codeVerifier = req.body.code_verifier;
 
-    if (!code || !redirectUri || !clientId || !codeVerifier) {
+    if (!code || !redirectUri || !clientId) {
       return oauthError(res, 400, 'invalid_request', 'Missing required token parameters');
     }
 
@@ -332,8 +335,16 @@ function createIndieAuthRouter(options) {
       return oauthError(res, 400, 'invalid_grant', 'redirect_uri or client_id does not match');
     }
 
-    if (stored.method !== 'S256' || !verifyPkceS256(codeVerifier, stored.codeChallenge)) {
-      return oauthError(res, 400, 'invalid_grant', 'PKCE verification failed');
+    const storedHasPkce = Boolean(stored.codeChallenge);
+    if (storedHasPkce) {
+      if (!codeVerifier) {
+        return oauthError(res, 400, 'invalid_request', 'code_verifier is required');
+      }
+      if (stored.method !== 'S256' || !verifyPkceS256(codeVerifier, stored.codeChallenge)) {
+        return oauthError(res, 400, 'invalid_grant', 'PKCE verification failed');
+      }
+    } else if (codeVerifier) {
+      return oauthError(res, 400, 'invalid_request', 'code_verifier must not be sent without PKCE');
     }
 
     authCodes.delete(code);
