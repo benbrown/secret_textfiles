@@ -1,6 +1,9 @@
 <h3>Every single post</h3>
-<ul>
-  {{#each posts}}
-    <li><a href="{{../rootUrl}}/read/{{id}}">{{metadata.title}}</a></li>
-  {{/each}}
-</ul>
+{{#each months}}
+  <h4>└ {{label}} /</h4>
+  <ul>
+    {{#each posts}}
+      <li><a href="{{../../rootUrl}}/read/{{id}}">{{metadata.title}}</a></li>
+    {{/each}}
+  </ul>
+{{/each}}

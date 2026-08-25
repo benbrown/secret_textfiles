@@ -260,6 +260,49 @@ function postsInStreamOrder(postsDesc) {
 }
 
 /**
+ * Format a YYYY-MM key as a month/year heading (e.g. "March 2024").
+ * @param {string} monthKey
+ * @returns {string}
+ */
+function formatMonthYearLabel(monthKey) {
+  const [yearStr, monthStr] = monthKey.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return monthKey;
+  const d = new Date(year, month - 1, 1);
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+/**
+ * Group posts by month (YYYY-MM) in stream order, newest month first.
+ * @param {Array<{id: string, metadata: any, rendered: string}>} postsDesc
+ * @returns {{months: Array<{key: string, label: string, posts: any[]}>}}
+ */
+function groupPostsByMonth(postsDesc) {
+  const ordered = postsInStreamOrder(postsDesc);
+  const postsByMonth = {};
+  const monthKeys = [];
+
+  for (const post of ordered) {
+    const dayKey = streamDayKeyFromPost(post);
+    const monthKey = dayKey ? dayKey.slice(0, 7) : '';
+    if (!postsByMonth[monthKey]) {
+      postsByMonth[monthKey] = [];
+      monthKeys.push(monthKey);
+    }
+    postsByMonth[monthKey].push(post);
+  }
+
+  const months = monthKeys.map((key) => ({
+    key,
+    label: key ? formatMonthYearLabel(key) : 'Unknown date',
+    posts: postsByMonth[key],
+  }));
+
+  return { months };
+}
+
+/**
  * Select whole days from newest until reaching min posts.
  * @param {Record<string, any[]>} postsByDay
  * @param {string[]} dayKeysDesc
@@ -442,11 +485,12 @@ app.get(`${ rootUrl }/archive`, async (req, res) => {
   await parser.loadText(process.env.PATH_TO_TEXT, true);
 
   const publicPosts = parser.sortDesc('datestamp');
+  const { months } = groupPostsByMonth(publicPosts);
   res.render('archive', {
 
     rootUrl: rootUrl,
     title: process.env.SITE_NAME,
-    posts: postsInStreamOrder(publicPosts),
+    months,
     meta: buildMeta({
       title: `${process.env.SITE_NAME} — Archive`,
       description: `Archive for ${process.env.SITE_NAME}.`,
