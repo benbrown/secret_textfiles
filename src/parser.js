@@ -121,6 +121,70 @@ function buildYouTubeEmbedHtml(videoId) {
   );
 }
 
+/** Path extensions allowed for direct `video:` file URLs. */
+const DIRECT_VIDEO_EXT_RE = /\.(mov|mp4|webm|m4v)$/i;
+
+/**
+ * Parses a user-supplied URL and returns an https/http href to a direct video file, or null.
+ * @param {string} raw
+ * @returns {string | null}
+ */
+function normalizeDirectVideoUrl(raw) {
+  const trimmed = raw.replace(/^<|>$/g, '').trim();
+  if (!trimmed) {
+    return null;
+  }
+  const href = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  let url;
+  try {
+    url = new URL(href);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return null;
+  }
+  if (!DIRECT_VIDEO_EXT_RE.test(url.pathname)) {
+    return null;
+  }
+  return url.href;
+}
+
+/**
+ * Escapes a string for use in an HTML double-quoted attribute value.
+ * @param {string} s
+ * @returns {string}
+ */
+function escapeHtmlAttr(s) {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Builds a responsive HTML5 video block for a direct file URL.
+ * @param {string} videoUrl
+ * @returns {string}
+ */
+function buildDirectVideoEmbedHtml(videoUrl) {
+  const pathname = new URL(videoUrl).pathname;
+  const ext = pathname.match(/\.(\w+)$/i)?.[1]?.toLowerCase();
+  let typeAttr = '';
+  if (ext === 'mov') {
+    typeAttr = ' type="video/quicktime"';
+  } else if (ext === 'webm') {
+    typeAttr = ' type="video/webm"';
+  } else if (ext === 'mp4' || ext === 'm4v') {
+    typeAttr = ' type="video/mp4"';
+  }
+  const src = escapeHtmlAttr(videoUrl);
+  return (
+    `<div class="post-video-embed">` +
+    `<video controls playsinline preload="metadata">` +
+    `<source src="${src}"${typeAttr}>` +
+    `</video>` +
+    `</div>`
+  );
+}
+
 /**
  * Decodes entities Markdown-it may emit in plain text (e.g. `&amp;` in query strings)
  * so the substring can be parsed with the URL API.
@@ -132,8 +196,9 @@ function decodeUrlFromHtml(s) {
 }
 
 /**
- * After Markdown render, replaces paragraphs whose body is only `video: <url>` with the
- * YouTube embed. The opening tag must be immediately followed by `video` (no space after `<p>`).
+ * After Markdown render, replaces paragraphs whose body is only `video: <url>` with a
+ * YouTube iframe or HTML5 video for direct file links (.mov, .mp4, .webm, .m4v).
+ * The opening tag must be immediately followed by `video` (no space after `<p>`).
  * Fenced code stays in `<pre>` and is not matched.
  * @param {string} html
  * @returns {string}
@@ -142,7 +207,14 @@ function replaceVideoDirectivesInHtml(html) {
   const replacer = (full, inner) => {
     const rawUrl = decodeUrlFromHtml(inner.trim());
     const id = extractYouTubeId(rawUrl);
-    return id ? buildYouTubeEmbedHtml(id) : full;
+    if (id) {
+      return buildYouTubeEmbedHtml(id);
+    }
+    const directUrl = normalizeDirectVideoUrl(rawUrl);
+    if (directUrl) {
+      return buildDirectVideoEmbedHtml(directUrl);
+    }
+    return full;
   };
   return html.replace(/<p>video:\s*(.+?)\s*<\/p>/gi, replacer);
 }
