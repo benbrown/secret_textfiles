@@ -83,11 +83,13 @@ function dateKeyFromPublished(published) {
   if (!published) {
     return undefined;
   }
+  // A bare date is already a key. new Date('YYYY-MM-DD') is UTC midnight, which
+  // formatDate() (local time) would shift back a day west of UTC — on every update.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(published)) {
+    return published;
+  }
   const parsed = new Date(published);
   if (Number.isNaN(parsed.getTime())) {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(published)) {
-      return published;
-    }
     return undefined;
   }
   return formatDate(parsed);
