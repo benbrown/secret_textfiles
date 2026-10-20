@@ -337,6 +337,59 @@ function formBodyToProperties(body) {
 }
 
 /**
+ * Plain-text summary of a markdown body (for post lists on small clients).
+ * @param {string} markdownBody
+ * @param {number} [maxLength]
+ * @returns {string}
+ */
+function summarizeMarkdown(markdownBody, maxLength = 140) {
+  const text = stripPhotoDirectivesFromMarkdown(markdownBody)
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[#>*_`~]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1).trimEnd()}…` : text;
+}
+
+/**
+ * Sort key for newest-first lists: date desc, then same-day suffix (-2, -3, …) desc.
+ * @param {{ id: string, metadata: Record<string, unknown> }} a
+ * @param {{ id: string, metadata: Record<string, unknown> }} b
+ * @returns {number}
+ */
+function compareNewestFirst(a, b) {
+  const da = String(a.metadata.date || '');
+  const db = String(b.metadata.date || '');
+  if (da !== db) {
+    return da < db ? 1 : -1;
+  }
+  const suffix = (id) => {
+    const m = path.basename(String(id)).match(/^\d{4}-\d{2}-\d{2}-(\d+)$/);
+    return m ? Number(m[1]) : 1;
+  };
+  return suffix(b.id) - suffix(a.id);
+}
+
+/**
+ * Select requested Micropub properties (all when none requested).
+ * @param {Record<string, string[]>} allProperties
+ * @param {string[]} requested
+ * @returns {Record<string, string[]>}
+ */
+function pickProperties(allProperties, requested) {
+  if (!requested.length) {
+    return allProperties;
+  }
+  return requested.reduce((acc, key) => {
+    if (allProperties[key]) {
+      acc[key] = allProperties[key];
+    }
+    return acc;
+  }, {});
+}
+
+/**
  * Create Express router for Micropub endpoints.
  * @param {{ baseUrl: string, rootUrl: string, textDir: string, getAccessTokenFromRequest: Function }} options
  * @returns {import('express').Router}
@@ -376,6 +429,31 @@ function createMicropubRouter(options) {
       }
 
       const sourceUrl = req.query.url;
+      if (sourceUrl === undefined) {
+        // Post list (micropub-extensions "q=source without url"): newest first, drafts included.
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+        const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+        const requested = []
+          .concat(req.query.properties || [])
+          .concat(req.query['properties[]'] || [])
+          .filter(Boolean);
+        try {
+          const posts = await parser.loadText(options.textDir, true);
+          const items = posts
+            .slice()
+            .sort(compareNewestFirst)
+            .slice(offset, offset + limit)
+            .map((post) => {
+              const allProperties = postToMicropubProperties(post);
+              allProperties.url = [`${options.baseUrl}${options.rootUrl}/read/${post.id}`];
+              allProperties.summary = [summarizeMarkdown(post.content)];
+              return { type: ['h-entry'], properties: pickProperties(allProperties, requested) };
+            });
+          return res.json({ items });
+        } catch (err) {
+          return micropubError(res, 500, 'server_error', 'Could not list posts');
+        }
+      }
       if (!sourceUrl || typeof sourceUrl !== 'string') {
         return micropubError(res, 400, 'invalid_request', 'url is required for q=source');
       }
