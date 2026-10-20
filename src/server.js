@@ -66,6 +66,8 @@ app.use(`${rootUrl}/auth`, createIndieAuthRouter({
   users,
   siteName: process.env.SITE_NAME,
   rootUrl,
+  // comma-separated long-lived Micropub tokens for devices without a browser
+  staticTokens: (process.env.MICROPUB_TOKENS || '').split(',').map((t) => t.trim()).filter(Boolean),
 }));
 app.use(`${rootUrl}/micropub`, createMicropubRouter({
   baseUrl: publicOrigin,

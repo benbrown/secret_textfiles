@@ -12,6 +12,10 @@ const authCodes = new Map();
 /** @type {Map<string, { scope: string, me: string, expiresAt: number }>} */
 const accessTokens = new Map();
 
+/** Long-lived tokens configured via env, for devices that can't run the browser flow. */
+/** @type {Map<string, { scope: string, me: string }>} */
+const staticTokens = new Map();
+
 /**
  * Normalize a URL for IndieAuth identity comparison (host + path only).
  * @param {string} url
@@ -80,6 +84,11 @@ function getAccessTokenFromRequest(req) {
   }
   if (!token) {
     return null;
+  }
+
+  const staticRecord = staticTokens.get(token);
+  if (staticRecord) {
+    return { token, record: staticRecord };
   }
 
   const record = accessTokens.get(token);
@@ -232,11 +241,16 @@ function buildRedirectWithCode(redirectUri, code, state) {
 
 /**
  * Create Express router for IndieAuth endpoints.
- * @param {{ me: string, users: Record<string, string>, siteName: string, rootUrl: string }} options
+ * @param {{ me: string, users: Record<string, string>, siteName: string, rootUrl: string, staticTokens?: string[] }} options
  * @returns {import('express').Router}
  */
 function createIndieAuthRouter(options) {
   const router = express.Router();
+
+  staticTokens.clear();
+  for (const token of options.staticTokens || []) {
+    staticTokens.set(token, { scope: GRANTED_SCOPES, me: options.me });
+  }
   const auth = basicAuth({
     users: options.users,
     challenge: true,
